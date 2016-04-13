@@ -45,12 +45,18 @@ _use_current=
 # Set this if you want it enabled globally i.e. for all devices in your system
 # If you want it enabled on a device-by-device basis, leave this unset and see:
 # https://wiki.archlinux.org/index.php/Linux-ck#How_to_Enable_the_BFQ_I.2FO_Scheduler
-_BFQ_enable_=
+_BFQ_enable_=y
+
+# In order to use LXC / LXD, user namesapce is required
+_USER_NS_enable_=y
+
+# Use LZ4 instead of Gzip to compress and decompress faster (but bigger)
+_LZ4_enable_=y
 
 ### Do no edit below this line unless you know what you're doing
 
-pkgname=(linux-ck linux-ck-headers)
-_kernelname=-ck
+pkgname=(linux-ck-userns linux-ck-userns-headers)
+_kernelname=-ck-userns
 _srcname=linux-4.4
 pkgver=4.4.7
 pkgrel=1
@@ -63,9 +69,9 @@ _ckpatchversion=1
 _ckpatchname="patch-4.4-ck${_ckpatchversion}"
 _gcc_patch="enable_additional_cpu_optimizations_for_gcc_v4.9+_kernel_v3.15+.patch"
 _bfqpath="http://algo.ing.unimo.it/people/paolo/disk_sched/patches/4.4.0-v7r11"
-source=("http://www.kernel.org/pub/linux/kernel/v4.x/${_srcname}.tar.xz"
+source=("http://cdn.kernel.org/pub/linux/kernel/v4.x/${_srcname}.tar.xz"
 "https://www.kernel.org/pub/linux/kernel/v4.x/${_srcname}.tar.sign"
-"http://www.kernel.org/pub/linux/kernel/v4.x/patch-${pkgver}.xz"
+"http://cdn.kernel.org/pub/linux/kernel/v4.x/patch-${pkgver}.xz"
 "https://www.kernel.org/pub/linux/kernel/v4.x/patch-${pkgver}.sign"
 'config.x86_64' 'config'
 'linux-ck.preset'
@@ -196,6 +202,19 @@ prepare() {
 			-i -e s'/CONFIG_DEFAULT_CFQ=y/# CONFIG_DEFAULT_CFQ is not set\nCONFIG_DEFAULT_BFQ=y/' ./.config
 	fi
 
+	### Optionally enable user namespace
+	if [ -n "$_USER_NS_enable_" ]; then
+		msg "Enabling user namespace..."
+		sed -i 's/# CONFIG_USER_NS is not set/CONFIG_USER_NS=y/' ./.config
+	fi
+
+	### Optionally compress kernel with LZ4
+	if [ -n "$_LZ4_enable_" ]; then
+		msg "Use LZ4 instead of Gzip to compress kernel..."
+		sed -i -e 's/CONFIG_KERNEL_GZIP=y/# CONFIG_KERNEL_GZIP is not set/' \
+			-i -e 's/# CONFIG_KERNEL_LZ4 is not set/CONFIG_KERNEL_LZ4=y/' ./.config
+	fi
+
 	# set extraversion to pkgrel
 	sed -ri "s|^(EXTRAVERSION =).*|\1 -${pkgrel}|" Makefile
 
@@ -240,7 +259,7 @@ build() {
 		msg "Running make bzImage and modules"
 }
 
-package_linux-ck() {
+package_linux-ck-userns() {
 	pkgdesc='Linux Kernel with the ck1 patchset featuring the Brain Fuck Scheduler v0.467.'
 	#_Kpkgdesc='Linux Kernel and modules with the ck1 patchset featuring the Brain Fuck Scheduler v0.467.'
 	#pkgdesc="${_Kpkgdesc}"
@@ -306,7 +325,7 @@ package_linux-ck() {
 }
 
 
-package_linux-ck-headers() {
+package_linux-ck-userns-headers() {
 	pkgdesc='Header files and scripts to build modules for linux-ck.'
 	#_Hpkgdesc='Header files and scripts to build modules for linux-ck.'
 	#pkgdesc="${_Hpkgdesc}"
